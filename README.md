@@ -204,21 +204,7 @@ db.t3.micro
 
 ---
 
-## User Data
 
-Put this inside EC2:
-
-```bash
-#!/bin/bash
-
-yum update -y
-
-yum install git python3 -y
-
-pip3 install Flask mysql-connector-python requests
-```
-
----
 
 ## Success Test
 
