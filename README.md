@@ -1,4 +1,18 @@
 # How to Connect Python Flask to AWS RDS MySQL Using .env Configuration Files
+
+We are using Terraform to create:
+- EC2 Instance
+- RDS Database
+- 2 Security groups:
+    - one for Web Server
+    - other for Database
+
+Prerequisites:
+- AWS
+- Terraform 
+
+I have application code and terraform code in the repository. 
+
 `app.py`
 
 ```python
