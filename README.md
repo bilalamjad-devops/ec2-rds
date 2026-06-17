@@ -107,6 +107,16 @@ DB_PASSWORD=SecurePassword123
 DB_NAME=web_db
 ```
 
+
+`requirements.txt`
+
+```python
+Flask
+mysql-connector-python
+requests
+python-dotenv
+```
+
 `templates/index.html`
 
 ```html
