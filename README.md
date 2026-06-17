@@ -1,1 +1,3 @@
-# ec2-rds
+```bash
+pip install Flask mysql-connector-python requests
+```
