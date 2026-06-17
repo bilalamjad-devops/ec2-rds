@@ -28,7 +28,7 @@ def get_db_connection():
     )
     cursor = conn.cursor()
     
-    # Initialize infrastructure application structures dynamically
+    # Create database and table if they do not already exist
     cursor.execute(f"CREATE DATABASE IF NOT EXISTS {RDS_DATABASE}")
     cursor.execute(f"USE {RDS_DATABASE}")
     cursor.execute("""
