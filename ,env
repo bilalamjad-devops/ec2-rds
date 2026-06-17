@@ -1,0 +1,4 @@
+DB_HOST=your-rds-database-endpoint.xxxxxx.us-east-1.rds.amazonaws.com
+DB_USER=admin
+DB_PASSWORD=SecurePassword123
+DB_NAME=web_db
