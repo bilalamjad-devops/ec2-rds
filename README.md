@@ -281,57 +281,12 @@ resource "aws_instance" "web_app_server" {
   
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
-  # Optional: Uncomment and provide your key name if you intend to execute manual test connections
-  # key_name               = "your-aws-ssh-key"
-
-  # User Data script that automatically constructs the app profile
-  user_data = <<-EOF
-              #!/bin/bash
-              # 1. System update and tool deployment
-              sudo apt-get update -y
-              sudo apt-get install -y git python3 python3-pip
-
-              # 2. Workspace initialization
-              mkdir -p /home/ubuntu/app
-              cd /home/ubuntu/app
-
-              # 3. Clones code repository contents (Replace with your actual public repository link)
-              git clone https://github.com/YOUR_USERNAME/YOUR_FLASK_REPO.git .
-
-              # 4. DYNAMIC ENVIRONMENT CREATION
-              # Automatically writes a custom .env file injecting the live generated RDS Endpoint
-              echo "DB_HOST=${aws_db_instance.mysql_rds.address}" > .env
-              echo "DB_USER=admin" >> .env
-              echo "DB_PASSWORD=SecurePassword123" >> .env
-              echo "DB_NAME=web_db" >> .env
-
-              # Ensure user permissions align cleanly
-              chown ubuntu:ubuntu .env
-
-              # 5. Dependency installation using your standard requirements format
-              pip3 install -r requirements.txt --break-system-packages
-
-              # 6. Fire up background application listener
-              nohup python3 app.py > flask.log 2>&1 &
-              EOF
-
   tags = {
     Name = "2-Tier-Flask-Environment-Server"
   }
 }
 
-# ==============================================================================
-# 5. AUTOMATED LIVE LAB ACCESS OUTPUTS
-# ==============================================================================
-output "deployment_access_url" {
-  description = "Copy and access this address route within your local browser profile"
-  value       = "http://${aws_instance.web_app_server.public_ip}:5000"
-}
 
-output "rds_internal_endpoint" {
-  description = "The database network address generated dynamically by AWS"
-  value       = aws_db_instance.mysql_rds.address
-}
 ```
 
 
