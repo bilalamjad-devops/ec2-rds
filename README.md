@@ -13,6 +13,13 @@ Prerequisites:
 
 I have application code and terraform code in the repository. 
 
+```repo
+https://github.com/bilalamjad-devops/ec2-rds.git
+```
+```repo
+cd ec2-rds
+```
+
 `app.py`
 
 ```python
