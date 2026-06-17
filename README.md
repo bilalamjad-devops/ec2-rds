@@ -173,7 +173,8 @@ python-dotenv
 
 
 ```bash
-pip install Flask mysql-connector-python requests python-dotenv```
+pip install -r requirements.txt
+```
 
 python3 app.py
 ## Terraform (Simple Version)
