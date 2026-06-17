@@ -13,7 +13,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Fetch database credentials securely from memory environment
+# Load database configuration from environment variables
 RDS_HOST = os.getenv("DB_HOST", "127.0.0.1")
 RDS_USER = os.getenv("DB_USER", "root")
 RDS_PASSWORD = os.getenv("DB_PASSWORD", "password123")
