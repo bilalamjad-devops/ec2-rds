@@ -6,28 +6,29 @@ import os
 from flask import Flask, render_template, request
 import mysql.connector
 import requests
-# 1. Import the library to read .env file
 from dotenv import load_dotenv
 
-# 2. Load the variables from .env file automatically
+# Load variables from local .env file profile
 load_dotenv()
 
 app = Flask(__name__)
 
-# Fetch database credentials from memory
+# Fetch database credentials securely from memory environment
 RDS_HOST = os.getenv("DB_HOST", "127.0.0.1")
 RDS_USER = os.getenv("DB_USER", "root")
 RDS_PASSWORD = os.getenv("DB_PASSWORD", "password123")
 RDS_DATABASE = os.getenv("DB_NAME", "web_db")
 
-
 def get_db_connection():
+    # Connect to the database engine host safely
     conn = mysql.connector.connect(
         host=RDS_HOST,
         user=RDS_USER,
         password=RDS_PASSWORD
     )
     cursor = conn.cursor()
+    
+    # Initialize infrastructure application structures dynamically
     cursor.execute(f"CREATE DATABASE IF NOT EXISTS {RDS_DATABASE}")
     cursor.execute(f"USE {RDS_DATABASE}")
     cursor.execute("""
@@ -39,33 +40,27 @@ def get_db_connection():
     conn.commit()
     return conn, cursor
 
-
 def get_instance_metadata():
+    """Fetches real-time AWS EC2 infrastructure context using IMDSv2"""
     try:
-        token = requests.put(
-            "http://169.254.169",
-            headers={"X-aws-ec2-metadata-token-ttl-seconds": "21600"},
-            timeout=2
-        ).text
+        # Step A: Request a secure IMDSv2 Access Token Session
+        token_url = "http://169.254.169.254/latest/api/token"
+        token_headers = {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}
+        token = requests.put(token_url, headers=token_headers, timeout=2).text
 
         headers = {"X-aws-ec2-metadata-token": token}
 
-        instance_id = requests.get(
-            "http://169.254.169",
-            headers=headers,
-            timeout=2
-        ).text
+        # Step B: Query instance identity parameters using the active token session
+        id_url = "http://169.254.169.254/latest/meta-data/instance-id"
+        instance_id = requests.get(id_url, headers=headers, timeout=2).text
 
-        az = requests.get(
-            "http://169.254.169",
-            headers=headers,
-            timeout=2
-        ).text
+        az_url = "http://169.254.169.254/latest/meta-data/placement/availability-zone"
+        az = requests.get(az_url, headers=headers, timeout=2).text
 
         return instance_id, az
-    except:
-        return "Local-Machine", "Local-Zone"
-
+    except Exception:
+        # Fallback context if running outside an active AWS environment locally
+        return "Local-Machine-Host", "Local-Testing-Zone"
 
 @app.route("/")
 def index():
@@ -76,36 +71,39 @@ def index():
         availability_zone=az
     )
 
-
 @app.route("/submit", methods=["POST"])
 def submit():
     data = request.form["user_data"]
-    conn, cursor = get_db_connection()
-    cursor.execute("INSERT INTO users (content) VALUES (%s)", (data,))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    
+    try:
+        conn, cursor = get_db_connection()
+        cursor.execute("INSERT INTO users (content) VALUES (%s)", (data,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        message = f"🎉 Success! Saved '{data}' directly to AWS RDS MySQL."
+    except Exception as e:
+        message = f"❌ Database Writing Error: {e}"
 
     instance_id, az = get_instance_metadata()
     return render_template(
         "index.html",
-        message=f"Saved: {data}",
+        message=message,
         instance_id=instance_id,
         availability_zone=az
     )
 
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-
+    # Serves the web interface on port 5000 externally
+    app.run(host="0.0.0.0", port=5000, debug=True)
 ```
 
 `.env`
 
 ```variables
-DB_HOST=://amazonaws.com
+DB_HOST=your-rds-database-endpoint.xxxxxx.us-east-1.rds.amazonaws.com
 DB_USER=admin
-DB_PASSWORD=password123
+DB_PASSWORD=SecurePassword123
 DB_NAME=web_db
 ```
 
@@ -165,8 +163,7 @@ DB_NAME=web_db
 
 
 ```bash
-pip install Flask mysql-connector-python requests
-```
+pip install Flask mysql-connector-python requests python-dotenv```
 
 python3 app.py
 ## Terraform (Simple Version)
