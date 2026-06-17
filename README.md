@@ -20,7 +20,7 @@ RDS_PASSWORD = os.getenv("DB_PASSWORD", "password123")
 RDS_DATABASE = os.getenv("DB_NAME", "web_db")
 
 def get_db_connection():
-    # Connect to the database engine host safely
+    # Create a connection to MySQL
     conn = mysql.connector.connect(
         host=RDS_HOST,
         user=RDS_USER,
