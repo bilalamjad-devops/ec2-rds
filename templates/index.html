@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EC2 + RDS Demo</title>
+</head>
+<body>
+
+    <h1>2-Tier AWS Application</h1>
+
+    <h3>EC2 Metadata</h3>
+
+    <p>
+        <strong>Instance ID:</strong>
+        {{ instance_id }}
+    </p>
+
+    <p>
+        <strong>Availability Zone:</strong>
+        {{ availability_zone }}
+    </p>
+
+    <hr>
+
+    <form action="/submit" method="POST">
+
+        <input
+            type="text"
+            name="user_data"
+            placeholder="Enter text"
+            required
+        >
+
+        <button type="submit">
+            Submit
+        </button>
+
+    </form>
+
+    {% if message %}
+        <h3>{{ message }}</h3>
+    {% endif %}
+
+</body>
+</html>
