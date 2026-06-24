@@ -6,10 +6,29 @@ We are using Terraform to create:
 - 2 Security groups:
     - one for Web Server
     - other for Database
+Bilal bhai, yeh code **bohot hi zabardast aur structured** hai! Aap ne is mein IMDSv2 ka use kiya hai jo bilkul up-to-date AWS security practices ke mutabik hai, aur Security Groups ki chaining (`security_groups = [aws_security_group.web_sg.id]`) bilkul perfect production standard par hai.
 
-Prerequisites:
-- AWS
-- Terraform 
+Lekin agar hum is code ko isi tarah execute karenge, toh is mein **2 bohot bade gaps (bugs)** hain jis ki wajah se aap ka final test fail ho jayega. Chalein, pehle unhein samajhte hain aur fix karte hain:
+
+---
+
+### ⚠️ Gaps & Issues in Current Code
+
+#### 1. EC2 par Automated Installation (User Data) Missing Hai
+
+Aap ne description mein toh likha hai *"Install Flask automatically using User Data"*, lekin aap ke Terraform `aws_instance` block ke andar `user_data` ka parameter bilkul khali hai. Agar user data nahi hoga, toh EC2 automatic python, flask, aur repositories setup nahi karega.
+
+#### 2. Dynamic `.env` File Creation Structure Missing Hai
+
+Aap ke Python code ko chalne ke liye `.env` file chahiye jo RDS ka endpoint read kare. Jab tak RDS create nahi hota, humein endpoint pata nahi hota. Yeh kaam humein Terraform ke user data ke zariye dynamic script se auto-generate karwana hoga.
+
+---
+
+### 🛠️ The Fixed & Complete Terraform Code
+
+Yahan aap ka updated `main.tf` hai jahan main ne pure **Automated User Data Bash Script** ko inject kar diya hai. Yeh script automatic system ko update karegi, clone karegi, dynamic `.env` file bana kar RDS ka endpoint auto-inject karegi, aur background mein app run kar degi:
+
+```tf
 # ==============================================================================
 # 1. PROVIDER & BACKEND DEFINITIONS
 # ==============================================================================
@@ -137,3 +156,17 @@ output "ec2_public_url" {
   value       = "http://${aws_instance.web_app_server.public_ip}:5000"
   description = "The public URL to test your application"
 }
+
+```
+
+---
+
+### 🎯 Next Plan Setup
+
+Aap ka yeh logic base bilkul ready hai. Jab aap is simple 2-Tier framework ka `terraform apply` verify kar lenge, toh agla step Hamzah Bhai ke project demand ke mutabik direct yeh hoga:
+
+1. Hum automatic network isolation ke liye **Custom VPC** layout map karenge.
+2. `aws_instance` resource block ko convert kar ke production-grade **Launch Template** aur **Auto Scaling Group (ASG)** mein convert karenge.
+3. Traffic distribution ke liye samne ek **Application Load Balancer (ALB)** block set kar denge.
+
+Yeh strategy bilkul aag laga degi! Aap is architecture code ko deploy kar ke output check karein, phir mujhe batayein hum is code ko expand karte hain.
