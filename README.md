@@ -10,203 +10,6 @@ We are using Terraform to create:
 Prerequisites:
 - AWS
 - Terraform 
-
-I have application code and terraform code in the repository. 
-
-```repo
-https://github.com/bilalamjad-devops/ec2-rds.git
-```
-```repo
-cd ec2-rds
-```
-
-`app.py`
-
-```python
-import os
-from flask import Flask, render_template, request
-import mysql.connector
-import requests
-from dotenv import load_dotenv
-
-# Load variables from local .env file profile
-load_dotenv()
-
-app = Flask(__name__)
-
-# Load database configuration from environment variables
-RDS_HOST = os.getenv("DB_HOST", "127.0.0.1")
-RDS_USER = os.getenv("DB_USER", "root")
-RDS_PASSWORD = os.getenv("DB_PASSWORD", "password123")
-RDS_DATABASE = os.getenv("DB_NAME", "web_db")
-
-def get_db_connection():
-    # Create a connection to MySQL
-    conn = mysql.connector.connect(
-        host=RDS_HOST,
-        user=RDS_USER,
-        password=RDS_PASSWORD
-    )
-    cursor = conn.cursor()
-    
-    # Create database and table if they do not already exist
-    cursor.execute(f"CREATE DATABASE IF NOT EXISTS {RDS_DATABASE}")
-    cursor.execute(f"USE {RDS_DATABASE}")
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            content VARCHAR(255)
-        )
-    """)
-    conn.commit()
-    return conn, cursor
-
-def get_instance_metadata():
-    """Fetches real-time AWS EC2 infrastructure context using IMDSv2"""
-    try:
-        # Step A: Request a secure IMDSv2 Access Token Session
-        token_url = "http://169.254.169.254/latest/api/token"
-        token_headers = {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}
-        token = requests.put(token_url, headers=token_headers, timeout=2).text
-
-        headers = {"X-aws-ec2-metadata-token": token}
-
-        # Step B: Query instance identity parameters using the active token session
-        id_url = "http://169.254.169.254/latest/meta-data/instance-id"
-        instance_id = requests.get(id_url, headers=headers, timeout=2).text
-
-        az_url = "http://169.254.169.254/latest/meta-data/placement/availability-zone"
-        az = requests.get(az_url, headers=headers, timeout=2).text
-
-        return instance_id, az
-    except Exception:
-        # Fallback context if running outside an active AWS environment locally
-        return "Local-Machine-Host", "Local-Testing-Zone"
-
-@app.route("/")
-def index():
-    instance_id, az = get_instance_metadata()
-    return render_template(
-        "index.html",
-        instance_id=instance_id,
-        availability_zone=az
-    )
-
-@app.route("/submit", methods=["POST"])
-def submit():
-    data = request.form["user_data"]
-    
-    try:
-        conn, cursor = get_db_connection()
-        cursor.execute("INSERT INTO users (content) VALUES (%s)", (data,))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        message = f"🎉 Success! Saved '{data}' directly to AWS RDS MySQL."
-    except Exception as e:
-        message = f"❌ Database Writing Error: {e}"
-
-    instance_id, az = get_instance_metadata()
-    return render_template(
-        "index.html",
-        message=message,
-        instance_id=instance_id,
-        availability_zone=az
-    )
-
-if __name__ == "__main__":
-    # Serves the web interface on port 5000 externally
-    app.run(host="0.0.0.0", port=5000, debug=True)
-```
-
-`.env`
-
-```variables
-DB_HOST=your-rds-database-endpoint.xxxxxx.us-east-1.rds.amazonaws.com
-DB_USER=admin
-DB_PASSWORD=SecurePassword123
-DB_NAME=web_db
-```
-
-
-`requirements.txt`
-
-```python
-Flask
-mysql-connector-python
-requests
-python-dotenv
-```
-
-`templates/index.html`
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>EC2 + RDS Demo</title>
-</head>
-<body>
-<!--
-    <h1>2-Tier AWS Application</h1>
-
-    <h3>EC2 Metadata</h3>
--->
-    <p>
-        <strong>Instance ID:</strong>
-        {{ instance_id }}
-    </p>
-
-    <p>
-        <strong>Availability Zone:</strong>
-        {{ availability_zone }}
-    </p>
-
-    <hr>
-
-    <form action="/submit" method="POST">
-
-        <input
-            type="text"
-            name="user_data"
-            placeholder="Enter text"
-            required
-        >
-
-        <button type="submit">
-            Submit
-        </button>
-
-    </form>
-
-    {% if message %}
-        <h3>{{ message }}</h3>
-    {% endif %}
-
-</body>
-</html>
-```
-
-
-
-
-
-
-
-```bash
-pip install -r requirements.txt
-```
-
-python3 app.py
-
-## Terraform (Simple Version)
-
-
-
-
-`main.tf`
-
-```tf
 # ==============================================================================
 # 1. PROVIDER & BACKEND DEFINITIONS
 # ==============================================================================
@@ -220,14 +23,12 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1" # Changes this to your targeted lab region
+  region = "us-east-1" 
 }
 
 # ==============================================================================
-# 2. ISOLATED NETWORK FIREWALLS (SECURITY GROUPS)
+# 2. SECURITY GROUPS (WEB & DATABASE TIER)
 # ==============================================================================
-
-# Web Application Security Group
 resource "aws_security_group" "web_sg" {
   name        = "flask-ec2-security-group"
   description = "Allows SSH and Application Port 5000"
@@ -256,7 +57,6 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# Database Tier Isolated Security Group
 resource "aws_security_group" "db_sg" {
   name        = "mysql-rds-security-group"
   description = "Isolates database traffic exclusively to the EC2 web tier"
@@ -266,7 +66,7 @@ resource "aws_security_group" "db_sg" {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.web_sg.id] # Strict architectural bridge
+    security_groups = [aws_security_group.web_sg.id] 
   }
 
   egress {
@@ -278,147 +78,62 @@ resource "aws_security_group" "db_sg" {
 }
 
 # ==============================================================================
-# 3. AWS MANAGED DATA STORE TIER (RDS MYSQL)
+# 3. AWS RDS MYSQL DATABASE TIER
 # ==============================================================================
 resource "aws_db_instance" "mysql_rds" {
   allocated_storage      = 20
   db_name                = "web_db"
   engine                 = "mysql"
   engine_version         = "8.0"
-  instance_class         = "db.t3.micro" # Matches your resource plan requirement
+  instance_class         = "db.t3.micro" 
   username               = "admin"
-  password               = "SecurePassword123" # Match with your app's intended profile
+  password               = "SecurePassword123" 
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   skip_final_snapshot    = true
   publicly_accessible    = false
 }
 
 # ==============================================================================
-# 4. COMPUTE TIER WITH AUTOMATED DYNAMIC .ENV BOOTSTRAPPING
+# 4. COMPUTE TIER WITH DYNAMIC USER DATA BOOTSTRAPPING
 # ==============================================================================
 resource "aws_instance" "web_app_server" {
-  ami           = "ami-0c7217cdde317cfec" # Clean Ubuntu 22.04 LTS image (us-east-1)
-  instance_type = "t2.micro"             # Free-tier compute unit
-  
+  ami                    = "ami-0c7217cdde317cfec" # Clean Ubuntu 22.04 LTS (us-east-1)
+  instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.web_sg.id]
+
+  # 🔥 FIXED: Automated bootstrap user_data injected dynamically
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo apt-get update -y
+              sudo apt-get install python3-pip python3-dev git -y
+
+              # Repo setup
+              cd /home/ubuntu
+              git clone https://github.com/bilalamjad-devops/ec2-rds.git
+              cd ec2-rds
+
+              # Requirements mapping
+              pip3 install -r requirements.txt
+
+              # 🔥 Dynamic generation of .env file mapping to active RDS Endpoint
+              echo "DB_HOST=${aws_db_instance.mysql_rds.address}" > .env
+              echo "DB_USER=${aws_db_instance.mysql_rds.username}" >> .env
+              echo "DB_PASSWORD=SecurePassword123" >> .env
+              echo "DB_NAME=web_db" >> .env
+
+              # Background Execution
+              nohup python3 app.py > flask.log 2>&1 &
+              EOF
 
   tags = {
     Name = "2-Tier-Flask-Environment-Server"
   }
 }
 
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Create:
-
-### Security Group for EC2
-
-Allow:
-
-```text
-22
-5000
-```
-
-### Security Group for RDS
-
-Allow:
-
-```text
-3306
-Source = EC2 Security Group
-```
-
-### EC2
-
-Install Flask automatically using User Data.
-
-### RDS
-
-Create:
-
-```text
-MySQL
-db.t3.micro
-20 GB
-```
-
----
-
-
-
-## Success Test
-
-Open:
-
-```text
-http://EC2-PUBLIC-IP:5000
-```
-
-You should see:
-
-```text
-Instance ID:
-i-0abc123
-
-Availability Zone:
-us-east-1a
-```
-
-Submit:
-
-```text
-Bilal Amjad
-```
-
-Connect to RDS:
-
-```bash
-mysql -h <rds-endpoint> -u admin -p
-```
-
-```sql
-USE web_db;
-
-SELECT * FROM users;
-```
-
-Output:
-
-```text
-+----+--------------+
-| id | content      |
-+----+--------------+
-|  1 | Bilal Amjad  |
-+----+--------------+
-```
-
-Once you get this working, the next step is extremely easy:
-
-```text
-EC2
-     ↓
-Launch Template
-     ↓
-ASG
-     ↓
-ALB
-     ↓
-RDS
-```
-
-The Flask code will remain almost unchanged. Only the infrastructure will grow. This is the same path many AWS engineers follow when building a production-style 2-tier architecture.
+# ==============================================================================
+# 5. OUTPUTS (To fetch tracking URL easily)
+# ==============================================================================
+output "ec2_public_url" {
+  value       = "http://${aws_instance.web_app_server.public_ip}:5000"
+  description = "The public URL to test your application"
+}
