@@ -11,14 +11,12 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1" # Changes this to your targeted lab region
+  region = "ap-south-1" 
 }
 
 # ==============================================================================
-# 2. ISOLATED NETWORK FIREWALLS (SECURITY GROUPS)
+# 2. SECURITY GROUPS (WEB & DATABASE TIER)
 # ==============================================================================
-
-# Web Application Security Group
 resource "aws_security_group" "web_sg" {
   name        = "flask-ec2-security-group"
   description = "Allows SSH and Application Port 5000"
@@ -47,7 +45,6 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# Database Tier Isolated Security Group
 resource "aws_security_group" "db_sg" {
   name        = "mysql-rds-security-group"
   description = "Isolates database traffic exclusively to the EC2 web tier"
@@ -57,7 +54,7 @@ resource "aws_security_group" "db_sg" {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.web_sg.id] # Strict architectural bridge
+    security_groups = [aws_security_group.web_sg.id] 
   }
 
   egress {
@@ -69,61 +66,57 @@ resource "aws_security_group" "db_sg" {
 }
 
 # ==============================================================================
-# 3. AWS MANAGED DATA STORE TIER (RDS MYSQL)
+# 3. AWS RDS MYSQL DATABASE TIER
 # ==============================================================================
 resource "aws_db_instance" "mysql_rds" {
   allocated_storage      = 20
   db_name                = "web_db"
   engine                 = "mysql"
   engine_version         = "8.0"
-  instance_class         = "db.t3.micro" # Matches your resource plan requirement
+  instance_class         = "db.t3.micro" 
   username               = "admin"
-  password               = "SecurePassword123" # Match with your app's intended profile
+  password               = "SecurePassword123" 
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   skip_final_snapshot    = true
   publicly_accessible    = false
 }
 
 # ==============================================================================
-# 4. COMPUTE TIER WITH AUTOMATED DYNAMIC .ENV BOOTSTRAPPING
+# 4. COMPUTE TIER WITH PRODUCTION-READY AUTO BOOTSTRAPPING
 # ==============================================================================
 resource "aws_instance" "web_app_server" {
-  ami           = "ami-0c7217cdde317cfec" # Clean Ubuntu 22.04 LTS image (us-east-1)
-  instance_type = "t2.micro"             # Free-tier compute unit
-  
+  ami                    = "ami-01a00762f46d584a1" # Clean Ubuntu 22.04 LTS (us-east-1)
+  instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
-  # Optional: Uncomment and provide your key name if you intend to execute manual test connections
-  # key_name               = "your-aws-ssh-key"
-
-  # User Data script that automatically constructs the app profile
   user_data = <<-EOF
               #!/bin/bash
-              # 1. System update and tool deployment
+              # 1. System packages update aur venv tool install karna
               sudo apt-get update -y
-              sudo apt-get install -y git python3 python3-pip
+              sudo apt-get install python3-pip python3-dev python3-venv git -y
 
-              # 2. Workspace initialization
-              mkdir -p /home/ubuntu/app
-              cd /home/ubuntu/app
+              # 2. Project cloning aur folder paths setup
+              cd /home/ubuntu
+              git clone https://github.com/bilalamjad-devops/ec2-rds.git
+              cd ec2-rds
 
-              # 3. Clones code repository contents (Replace with your actual public repository link)
-              git clone https://github.com/YOUR_USERNAME/YOUR_FLASK_REPO.git .
+              # 3. Ownership fix karna taake PEP 668 external error na aaye
+              sudo chown -R ubuntu:ubuntu /home/ubuntu/ec2-rds
 
-              # 4. DYNAMIC ENVIRONMENT CREATION
-              # Automatically writes a custom .env file injecting the live generated RDS Endpoint
+              # 4. Virtual Environment isolated create aur activate karna
+              python3 -m venv venv
+              source venv/bin/activate
+
+              # 5. Production packages fetch karna clean context mein
+              pip3 install -r requirements.txt
+
+              # 6. Dynamic .env mapping to dynamic active RDS Endpoint
               echo "DB_HOST=${aws_db_instance.mysql_rds.address}" > .env
-              echo "DB_USER=admin" >> .env
+              echo "DB_USER=${aws_db_instance.mysql_rds.username}" >> .env
               echo "DB_PASSWORD=SecurePassword123" >> .env
               echo "DB_NAME=web_db" >> .env
 
-              # Ensure user permissions align cleanly
-              chown ubuntu:ubuntu .env
-
-              # 5. Dependency installation using your standard requirements format
-              pip3 install -r requirements.txt --break-system-packages
-
-              # 6. Fire up background application listener
+              # 7. Background production daemon execution
               nohup python3 app.py > flask.log 2>&1 &
               EOF
 
@@ -132,15 +125,7 @@ resource "aws_instance" "web_app_server" {
   }
 }
 
-# ==============================================================================
-# 5. AUTOMATED LIVE LAB ACCESS OUTPUTS
-# ==============================================================================
-output "deployment_access_url" {
-  description = "Copy and access this address route within your local browser profile"
-  value       = "http://${aws_instance.web_app_server.public_ip}:5000"
-}
-
-output "rds_internal_endpoint" {
-  description = "The database network address generated dynamically by AWS"
-  value       = aws_db_instance.mysql_rds.address
+output "ec2_public_url" {
+  value       = "http://$${aws_instance.web_app_server.public_ip}:5000"
+  description = "The public URL to test your application"
 }
